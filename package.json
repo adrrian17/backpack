@@ -1,0 +1,9 @@
+{
+  "name" : "backpack",
+  "version" : "0.1.0",
+  "dependencies" : {
+    "cheerio" : "0.16.0",
+    "csp": "0.0.1-alpha1"
+  },
+  "engines" : { "node" : ">= 0.11.13" }
+}
