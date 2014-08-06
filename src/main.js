@@ -1,34 +1,35 @@
 /* Modules */
-var csp              = require("csp");
-var urlValidator     = require("./lib/url_validator.js");
-var httpFetcher      = require("./lib/http_fetcher.js");
+var csp          = require("js-csp")
+var http         = require("http")
+var urlValidator = require("./lib/url_validator.js")
+var httpFetcher  = require("./lib/http_fetcher.js")
+var articleView  = require("./lib/article_view.js")
 
-/* Channels */
-var inputChan        = new csp.Chan();
-var downloadChan     = new csp.Chan();
-var scrapChan        = new csp.Chan();
+/* Shared channels */
+var genCh         = csp.chan()
+var articleViewCh = csp.chan()
 
-gen = function* (inputChan) {
-  yield inputChan.put("http://ssodelta.wordpress.com/?p=599&preview=true");
-  yield inputChan.put("http://blog.ezyang.com/2011/11/how-to-read-haskell/");
-  yield inputChan.put("http://www.strikingly.com/how-to-design");
-  yield inputChan.put("http://www.evanmiller.org/how-not-to-sort-by-average-rating.html");
-  yield inputChan.put("https://developer.apple.com/library/prerelease/ios/referencelibrary/GettingStarted/LandingPage/index.html")
-  yield inputChan.put("https://github.com/cheeriojs/cheerio")
-  yield inputChan.put("https://d13yacurqjgara.cloudfront.net/users/21909/screenshots/129608/shot_1299963399.jpg");
+/* It reads from genCh channel and puts raw html into articleViewCh channel */
+csp.go(httpFetcher.fetch, [genCh, articleViewCh])
+
+/* It reads from articleViewCh channel, then parses html and prints to standard output */
+csp.go(articleView.parse, [articleViewCh])
+
+
+function defaultServer(req, res) {
+  var inputBuffer = ""
+  req
+    .setEncoding('utf8')
+    .on('data', function(chunk) { inputBuffer += chunk })
+    .on('end', function() {
+      csp.go(function*() {
+        if (urlValidator.isURL(inputBuffer)) {
+          res.writeHead(200, {'Content-Type': 'text/plain'});
+          res.end('Added ' + inputBuffer + ' to processing queue\n');
+          yield csp.put(genCh, inputBuffer)
+        }
+      })
+    });
 }
-
-csp.spawn(gen, inputChan);
-csp.spawn(urlValidator.validate, inputChan, downloadChan);
-csp.spawn(httpFetcher.fetch, downloadChan, scrapChan);
-
-partition = function* (channel) {
-  for(;;) {
-    // PSEUDO CODE ALERT!
-    // var message = yield channel.take()
-    // if isArticleView(message) then do ArticleViewThingInOtherFile(message)
-    // if isWebView(message) then do WebViewThingInOtherFile(message)
-  }
-}
-
-csp.spawn(partition, scrapChan)
+http.createServer(defaultServer).listen(1337, '0.0.0.0');
+console.log('Server running at http://127.0.0.1:1337/');
