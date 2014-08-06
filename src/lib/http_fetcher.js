@@ -1,10 +1,10 @@
-var csp              = require("csp");
+ var csp          = require("js-csp");
 
 exports.fetch = function* (downloadChan, scrapChan) {
   http  = require("http")
   https = require("https")
   for(;;) {
-    var url = yield downloadChan.take();
+    var url = yield csp.take(downloadChan);
     var module = /^https:/.test(url) ? https : http;
     _requestContent(module, url, scrapChan);
   }
@@ -12,21 +12,22 @@ exports.fetch = function* (downloadChan, scrapChan) {
 
 _requestContent = function (module, url, channel) {
   return module.get(url, function(response) {
-    var data = "";
+    var inputBuffer = ""
+
+    response.setEncoding('utf8')
 
     response.on("data", function(chunk) {
-      return data += chunk;
+      return inputBuffer += chunk;
     });
 
     return response.on("end", function () {
       message = {
         content_type: response.headers["content-type"]
-        , data: "data"
+        , data: inputBuffer
         , url: url
       }
-      csp.spawn(function* () {
-        yield channel.put(message);
-        csp.quit();
+      csp.go(function* () {
+        yield csp.put(channel, message)
       });
     });
   }).on("error", function* () {

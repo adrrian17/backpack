@@ -32,6 +32,8 @@ exports.isURL = _isURL;
 exports.validate = function* (inputChan, downloadChan) {
   for(;;) {
     var userUrl = yield inputChan.take();
+    console.log(userUrl)
+    console.log(_isURL(userUrl))
     if (_isURL(userUrl)) {
       yield downloadChan.put(userUrl);
     }
